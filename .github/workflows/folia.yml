@@ -12,7 +12,6 @@ jobs:
       artifact_name_default: ${{ steps.upload_release_default.outputs.asset_name }}
       artifact_name_1_19_4: ${{ steps.upload_release_1_19_4.outputs.asset_name }}
       artifact_name_1_20_4: ${{ steps.upload_release_1_20_4.outputs.asset_name }}
-      artifact_name_1_20_6: ${{ steps.upload_release_1_20_6.outputs.asset_name }}
 
     steps:
       - name: Set the git information
@@ -90,24 +89,6 @@ jobs:
           ./gradlew applyPatches
           ./gradlew createMojmapPaperclipJar
 
-      # Получаем имя собранного JAR файла для ветки ver/1.20.6
-      - name: Get jar file name for ver/1.20.6
-        id: get_name_1_20_6
-        run: echo "::set-output name=name::$(ls ~/folia-1.20.6/build/libs/ | grep paperclip)"
-
-      # Создаем релиз для всех веток
-      - name: Create Release for all branches
-        id: create_release_default
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.date.outputs.date }}-default
-          release_name: Release-${{ steps.date.outputs.date }}-default
-          body: "Release with artifacts for ver/1.19.4, ver/1.20.4, ver/1.20.6, and default branch"
-          draft: false
-          prerelease: false
-
       # Загружаем JAR файл для основной ветки
       - name: Upload Release Asset for default branch
         id: upload_release_default
@@ -142,18 +123,6 @@ jobs:
           upload_url: ${{ steps.create_release_default.outputs.upload_url }}
           asset_path: /home/runner/folia-1.20.4/build/libs/${{ steps.get_name_1_20_4.outputs.name }}
           asset_name: ${{ steps.get_name_1_20_4.outputs.name }}
-          asset_content_type: application/java-archive
-
-      # Загружаем JAR файл для ветки ver/1.20.6
-      - name: Upload Release Asset for ver/1.20.6
-        id: upload_release_1_20_6
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release_default.outputs.upload_url }}
-          asset_path: /home/runner/folia-1.20.6/build/libs/${{ steps.get_name_1_20_6.outputs.name }}
-          asset_name: ${{ steps.get_name_1_20_6.outputs.name }}
           asset_content_type: application/java-archive
 
     permissions:
