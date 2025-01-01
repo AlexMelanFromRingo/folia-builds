@@ -31,8 +31,8 @@ jobs:
         run: |
           sudo timedatectl set-timezone Europe/Kiev
 
-      # Клонируем репозиторий и применяем патчи
-      - name: Clone Folia repo and apply patches
+      # Клонируем основной репозиторий один раз и применяем патчи
+      - name: Clone and apply patches
         run: |
           git clone https://github.com/PaperMC/Folia.git ~/folia
           cd ~/folia
@@ -51,15 +51,22 @@ jobs:
         run: |
           for branch in ${{ steps.branches.outputs.branches }}; do
             echo "Building branch: $branch"
-            git checkout $branch
-            
-            # Убедимся, что мы в правильной директории и файл gradlew существует
+
+            # Клонируем репозиторий для каждой ветки в отдельную директорию
+            branch_dir=~/folia_$branch
+            git clone --single-branch --branch $branch https://github.com/PaperMC/Folia.git $branch_dir
+            cd $branch_dir
+
+            # Убедимся, что файл gradlew существует
             if [ ! -f "./gradlew" ]; then
-              echo "ERROR: gradlew not found!"
+              echo "ERROR: gradlew not found in $branch_dir!"
               exit 1
             fi
 
-            # Выполняем команды сборки в зависимости от ветки
+            # Применяем патчи для каждой ветки
+            ./gradlew applyPatches
+
+            # Выполняем сборку в зависимости от ветки
             if [ "$branch" == "master" ]; then
               echo "Running build for master branch"
               ./gradlew createMojmapPaperclipJar
