@@ -30,7 +30,7 @@ jobs:
       # Список веток, которые нужно собрать (с версиями для Java 17 и Java 21)
       - name: Set branches list
         id: branches
-        run: echo "::set-output name=branches::'master ver/1.19.4 ver/1.20.4 ver/1.20.6 ver/old-java-branch1 ver/old-java-branch2'"
+        run: echo "::set-output name=branches::'ver/1.19.4 ver/1.20.4 ver/1.20.6 ver/old-java-branch1 ver/old-java-branch2'"
 
       # Создание релиза с тегом
       - name: Create GitHub release
@@ -57,7 +57,7 @@ jobs:
             cd ~/folia
             
             # Определяем, какая версия JDK использовать в зависимости от ветки
-            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6 || "$branch" == master]] then
+            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6]]; then
               echo "Using JDK 21 for branch $branch"
               # Устанавливаем JDK 21 для этих веток
               uses: actions/setup-java@v4
