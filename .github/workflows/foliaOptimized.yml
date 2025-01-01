@@ -17,6 +17,13 @@ jobs:
           
       - uses: actions/checkout@v4
 
+      # Устанавливаем JDK 21
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'zulu'
+
       # Настроим временную зону на Киев
       - name: Set timezone to Kyiv
         run: |
@@ -27,57 +34,60 @@ jobs:
         id: date
         run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
 
-      # Список веток, которые нужно собрать (с версиями для Java 17 и Java 21)
-      - name: Set branches list
-        id: branches
-        run: echo "::set-output name=branches::ver/1.19.4 ver/1.20.4 ver/1.20.6 ver/old-java-branch1 ver/old-java-branch2"
+      # Клонируем репозиторий и применяем патчи для основной ветки
+      - name: Clone Folia repo and apply patches (default branch)
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia
+          cd ~/folia
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
 
-      # Создание релиза с тегом
-      - name: Create GitHub release
+      # Получаем имя собранного JAR файла для основной ветки
+      - name: Get jar file name for default branch
+        id: get_name
+        run: echo "::set-output name=name::$(ls ~/folia/build/libs/ | grep paperclip)"
+
+      # Создаем один общий релиз с сегодняшним тегом
+      - name: Create Release for all branches
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: "release-${{ steps.date.outputs.date }}"
-          release_name: "Release for ${{ steps.date.outputs.date }}"
-          body: |
-            This release contains the builds for the specified branches.
+          tag_name: ${{ steps.date.outputs.date }}  # Тег с сегодняшней датой
+          release_name: Release-${{ steps.date.outputs.date }}
+          body: "Release for all branches"
           draft: false
           prerelease: false
+      
+      # Загружаем JAR файл основной ветки в общий релиз
+      - name: Upload Release Asset for default branch
+        id: upload_release_default
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: /home/runner/folia/build/libs/${{ steps.get_name.outputs.name }}
+          asset_name: default-${{ steps.get_name.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Список веток, которые нужно собрать
+      - name: Set branches list
+        id: branches
+        run: echo "::set-output name=branches::'ver/1.19.4 ver/1.20.4 ver/1.20.6'"  # Можете добавить сюда любую ветку
 
       # Цикл по всем веткам для их сборки
       - name: Build and Upload for all specified branches
         run: |
-          # Преобразуем список веток в массив
           branches="${{ steps.branches.outputs.branches }}"
-          IFS=' ' read -r -a branch_array <<< "$branches"  # Разделяем строку на массив по пробелам
-
-          for branch in "${branch_array[@]}"; do  # Используем массив в цикле
+          for branch in $branches; do
             echo "Building branch: $branch"
             rm -rf ~/folia
             git clone https://github.com/PaperMC/Folia.git ~/folia -b $branch
             cd ~/folia
-            
-            # Определяем, какая версия JDK использовать в зависимости от ветки
-            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6 ]]; then
-              echo "Using JDK 21 for branch $branch"
-              # Устанавливаем JDK 21 для этих веток
-              uses: actions/setup-java@v4
-              with:
-                java-version: 21
-                distribution: 'zulu'
-              ./gradlew applyPatches
-              ./gradlew createMojmapPaperclipJar
-            else
-              echo "Using JDK 17 for branch $branch"
-              # Для веток с Java 17 устанавливаем JDK 17 и используем другую команду сборки
-              uses: actions/setup-java@v4
-              with:
-                java-version: 17
-                distribution: 'zulu'
-              ./gradlew build  # Используем другую команду сборки для старых версий
-            fi
+            ./gradlew applyPatches
+            ./gradlew createMojmapPaperclipJar
             
             # Получаем имя JAR файла для каждой ветки
             JAR_NAME=$(ls ~/folia/build/libs/ | grep paperclip)
