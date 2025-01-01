@@ -1,4 +1,4 @@
-name: folia
+name: folia-ver-1.20.6
 
 # Controls when the workflow will run
 on:
@@ -30,16 +30,10 @@ jobs:
         run: |
           sudo timedatectl set-timezone Europe/Kiev
 
-      - name: Clone Folia repo
+      - name: Clone Folia repo (ver/1.20.6)
         run: |
-          git clone https://github.com/PaperMC/Folia.git ~/folia
+          git clone --branch ver/1.20.6 https://github.com/PaperMC/Folia.git ~/folia
 
-      - name: Get dev branch info
-        id: dev
-        run: |
-          cd ~/folia
-          echo "::set-output name=dev::$(git branch -a | grep dev | sed 's/^.................//' | sort -rV)"
-      
       - name: Apply patches
         run: |
           cd ~/folia
@@ -123,21 +117,9 @@ jobs:
         run: |
           sudo timedatectl set-timezone Europe/Kiev
 
-      - name: Clone Folia repo
+      - name: Clone Folia repo (ver/1.20.6)
         run: |
-          git clone https://github.com/PaperMC/Folia.git ~/folia
-
-      - name: Get dev branch info
-        id: dev1
-        run: |
-          cd ~/folia
-          echo "::set-output name=dev1::$(git branch -a | grep dev | sed 's/^.................//' | sort -rV)"
-      
-      - name: Reclone dev branch to build
-        run: |
-          cd ~
-          rm -rf folia
-          git clone https://github.com/papermc/folia -b ${{ steps.dev1.outputs.dev1 }}
+          git clone --branch ver/1.20.6 https://github.com/PaperMC/Folia.git ~/folia
 
       - name: Apply patches
         run: |
