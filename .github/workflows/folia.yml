@@ -1,7 +1,7 @@
 name: folia
 
 on:
-  workflow_dispatch:  # Позволяет вручную запускать workflow через интерфейс GitHub
+  workflow_dispatch:  # Позволяет запускать вручную
   schedule:
     - cron: "0 12 * * *"  # Сборка в 12:00 по Киеву (UTC+3 летом)
 
@@ -36,9 +36,9 @@ jobs:
         run: |
           git clone https://github.com/PaperMC/Folia.git ~/folia
           cd ~/folia
-          ./gradlew applyPatches
+          ./gradlew applyPatches  # Применяем патчи
 
-      # Получаем список всех веток в репозитории
+      # Получаем список всех веток
       - name: Get all branches
         id: branches
         run: |
@@ -46,22 +46,41 @@ jobs:
           branches=$(git branch -r | grep -v '\->' | sed 's/origin\///' | tr '\n' ' ')
           echo "::set-output name=branches::${branches}"
 
-      # Сборка всех веток, полученных из предыдущего шага
+      # Сборка всех веток с различными командами в зависимости от ветки
       - name: Build and release for each branch
         run: |
           for branch in ${{ steps.branches.outputs.branches }}; do
             echo "Building branch: $branch"
             git checkout $branch
-            ./gradlew createMojmapPaperclipJar
+            
+            # Убедимся, что мы в правильной директории и файл gradlew существует
+            if [ ! -f "./gradlew" ]; then
+              echo "ERROR: gradlew not found!"
+              exit 1
+            fi
+
+            # Выполняем команды сборки в зависимости от ветки
+            if [ "$branch" == "master" ]; then
+              echo "Running build for master branch"
+              ./gradlew createMojmapPaperclipJar
+            elif [[ "$branch" =~ ^ver/1\.19\.[0-9]+$ ]]; then
+              echo "Running build for $branch"
+              ./gradlew createReobfBundlerJar
+            elif [[ "$branch" =~ ^ver/1\.20\.[0-9]+$ ]]; then
+              echo "Running build for $branch"
+              ./gradlew createMojmapPaperclipJar
+            else
+              echo "Branch $branch is not a supported version, skipping build."
+            fi
+
             BUILD_DATE=$(date +'%Y-%m-%d')
             JAR_NAME=$(ls build/libs/ | grep paperclip)
 
-            # Создаем релиз для каждой ветки
+            # Создаём релиз для каждой ветки
             RELEASE_NAME="Release-${branch}-${BUILD_DATE}"
             TAG_NAME="release-${branch}-${BUILD_DATE}"
             echo "Creating release for ${branch}..."
 
-            # Создаём релиз
             release_response=$(curl -X POST \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
@@ -73,7 +92,6 @@ jobs:
                   }' \
               https://api.github.com/repos/PaperMC/Folia/releases)
 
-            # Получаем URL для загрузки
             upload_url=$(echo "$release_response" | jq -r '.upload_url' | sed 's/{?name,label}//')
 
             # Загружаем собранный JAR файл как asset
