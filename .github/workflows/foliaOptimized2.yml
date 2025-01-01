@@ -57,7 +57,7 @@ jobs:
             cd ~/folia
             
             # Определяем, какая версия JDK использовать в зависимости от ветки
-            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6 || "$branch" == master]]; then
+            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6 || "$branch" == master]] then
               echo "Using JDK 21 for branch $branch"
               # Устанавливаем JDK 21 для этих веток
               uses: actions/setup-java@v4
