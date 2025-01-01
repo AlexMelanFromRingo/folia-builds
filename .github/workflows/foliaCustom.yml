@@ -1,0 +1,130 @@
+name: folia-custom
+
+on:
+  workflow_dispatch:  # Позволяет запускать workflow вручную через интерфейс GitHub
+  schedule:
+    - cron: "0 12 * * *"  # Сборка в 12:00 по Киеву (UTC+3 летом)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set the git information
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - uses: actions/checkout@v4
+
+      # Устанавливаем JDK 21
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'zulu'
+
+      # Настроим временную зону на Киев
+      - name: Set timezone to Kyiv
+        run: |
+          sudo timedatectl set-timezone Europe/Kiev
+
+      # Клонируем репозиторий и применяем патчи для основной ветки
+      - name: Clone Folia repo and apply patches (default branch)
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia
+          cd ~/folia
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем дату сборки
+      - name: Get date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+      # Получаем имя собранного JAR файла
+      - name: Get jar file name
+        id: get_name
+        run: echo "::set-output name=name::$(ls ~/folia/build/libs/ | grep paperclip)"
+
+      # Создаем релиз с тегом для основной ветки
+      - name: Create Release for default branch
+        id: create_release_default
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.date.outputs.date }}-default
+          release_name: Release-${{ steps.date.outputs.date }}-default
+          body: "Release for default branch"
+          draft: false
+          prerelease: false
+      
+      # Загружаем JAR файл основной ветки
+      - name: Upload Release Asset for default branch
+        id: upload_release_default
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_default.outputs.upload_url }}
+          asset_path: /home/runner/folia/build/libs/${{ steps.get_name.outputs.name }}
+          asset_name: ${{ steps.get_name.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Удаляем все файлы и клонируем ветку ver/1.19.4
+      - name: Reclone ver/1.19.4 branch and build
+        run: |
+          rm -rf ~/folia
+          git clone https://github.com/PaperMC/Folia.git ~/folia -b ver/1.19.4
+          cd ~/folia
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем дату для сборки ветки ver/1.19.4
+      - name: Get date for ver/1.19.4
+        id: date_ver
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+      # Получаем имя собранного JAR файла для вер. 1.19.4
+      - name: Get jar file name ver/1.19.4
+        id: get_name_ver
+        run: echo "::set-output name=name::$(ls ~/folia/build/libs/ | grep paperclip)"
+
+      # Создаем релиз для ветки ver/1.19.4
+      - name: Create Release for ver/1.19.4
+        id: create_release_ver
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.date_ver.outputs.date }}-ver-1.19.4
+          release_name: Release-${{ steps.date_ver.outputs.date }}-ver-1.19.4
+          body: "Release for ver/1.19.4 branch"
+          draft: false
+          prerelease: false
+      
+      # Загружаем JAR файл для ветки ver/1.19.4
+      - name: Upload Release Asset for ver/1.19.4
+        id: upload_release_ver
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_ver.outputs.upload_url }}
+          asset_path: /home/runner/folia/build/libs/${{ steps.get_name_ver.outputs.name }}
+          asset_name: ${{ steps.get_name_ver.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Обновляем ссылку на общий релиз
+      - name: Set upload_url
+        id: set_upload_url
+        uses: noobly314/share-data@v1
+        with:
+          share-id: release_url
+          mode: set
+          key: url
+          value: ${{ steps.create_release_ver.outputs.upload_url }}
+          
+    permissions:
+      contents: write
