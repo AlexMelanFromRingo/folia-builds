@@ -17,13 +17,6 @@ jobs:
           
       - uses: actions/checkout@v4
 
-      # Устанавливаем JDK 21
-      - name: JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: 21
-          distribution: 'zulu'
-
       # Настроим временную зону на Киев
       - name: Set timezone to Kyiv
         run: |
@@ -86,8 +79,26 @@ jobs:
             rm -rf ~/folia
             git clone https://github.com/PaperMC/Folia.git ~/folia -b $branch
             cd ~/folia
+
+            # Устанавливаем JDK в зависимости от ветки
+            if [[ "$branch" == "ver/1.19.4" || "$branch" == "ver/1.20.4" || "$branch" == "ver/1.20.6" ]]; then
+              echo "Using JDK 17 for $branch"
+              # Устанавливаем JDK 17 для этих веток
+              sudo apt-get update
+              sudo apt-get install -y openjdk-17-jdk
+              export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+              export PATH=$JAVA_HOME/bin:$PATH
+            else
+              echo "Using JDK 21 for $branch"
+              # Устанавливаем JDK 21 для остальных веток
+              uses: actions/setup-java@v4
+              with:
+                java-version: 21
+                distribution: 'zulu'
+            fi
+
             ./gradlew applyPatches
-            ./gradlew createMojmapPaperclipJar
+            ./gradlew createReobfBundlerJar
             
             # Получаем имя JAR файла для каждой ветки
             JAR_NAME=$(ls ~/folia/build/libs/ | grep paperclip)

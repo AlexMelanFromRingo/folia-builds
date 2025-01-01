@@ -1,0 +1,116 @@
+name: folia-custom
+
+on:
+  workflow_dispatch:  # Позволяет запускать workflow вручную через интерфейс GitHub
+  schedule:
+    - cron: "0 12 * * *"  # Сборка в 12:00 по Киеву (UTC+3 летом)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set the git information
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - uses: actions/checkout@v4
+
+      # Настроим временную зону на Киев
+      - name: Set timezone to Kyiv
+        run: |
+          sudo timedatectl set-timezone Europe/Kiev
+
+      # Получаем текущую дату для релиза
+      - name: Get date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+      # Клонируем репозиторий и применяем патчи для основной ветки
+      - name: Clone Folia repo and apply patches (default branch)
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia
+          cd ~/folia
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем имя собранного JAR файла для основной ветки
+      - name: Get jar file name for default branch
+        id: get_name
+        run: echo "::set-output name=name::$(ls ~/folia/build/libs/ | grep paperclip)"
+
+      # Создаем один общий релиз с сегодняшним тегом
+      - name: Create Release for all branches
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.date.outputs.date }}  # Тег с сегодняшней датой
+          release_name: Release-${{ steps.date.outputs.date }}
+          body: "Release for all branches"
+          draft: false
+          prerelease: false
+      
+      # Загружаем JAR файл основной ветки в общий релиз
+      - name: Upload Release Asset for default branch
+        id: upload_release_default
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: /home/runner/folia/build/libs/${{ steps.get_name.outputs.name }}
+          asset_name: default-${{ steps.get_name.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Список веток, которые нужно собрать
+      - name: Set branches list
+        id: branches
+        run: echo "::set-output name=branches::'ver/1.19.4 ver/1.20.4 ver/1.20.6'"  # Можете добавить сюда любую ветку
+
+      # Цикл по всем веткам для их сборки
+      - name: Build and Upload for all specified branches
+        run: |
+          branches="${{ steps.branches.outputs.branches }}"
+          for branch in $branches; do
+            echo "Building branch: $branch"
+            rm -rf ~/folia
+            git clone https://github.com/PaperMC/Folia.git ~/folia -b $branch
+            cd ~/folia
+
+            # Устанавливаем JDK в зависимости от ветки
+            if [[ "$branch" == "ver/1.19.4" || "$branch" == "ver/1.20.4" || "$branch" == "ver/1.20.6" ]]; then
+              echo "Using JDK 17 for $branch"
+              # Устанавливаем JDK 17 для этих веток
+              sudo apt-get update
+              sudo apt-get install -y openjdk-17-jdk
+              export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+              export PATH=$JAVA_HOME/bin:$PATH
+            else
+              echo "Using JDK 21 for $branch"
+              # Устанавливаем JDK 21 для остальных веток
+              uses: actions/setup-java@v4
+              with:
+                java-version: 21
+                distribution: 'zulu'
+            fi
+
+            ./gradlew applyPatches
+            ./gradlew createReobfBundlerJar
+            
+            # Получаем имя JAR файла для каждой ветки
+            JAR_NAME=$(ls ~/folia/build/libs/ | grep paperclip)
+            
+            # Загружаем JAR файл каждой ветки в общий релиз
+            echo "Uploading $JAR_NAME for $branch"
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/java-archive" \
+              --data-binary @~/folia/build/libs/$JAR_NAME \
+              "${{ steps.create_release.outputs.upload_url }}?name=$branch-$JAR_NAME"
+          done
+
+    permissions:
+      contents: write
