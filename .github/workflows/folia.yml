@@ -9,10 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      artifact-name-default: ${{ steps.upload_release_default.outputs.asset_name }}
-      artifact-name-1.19.4: ${{ steps.upload_release_1.19.4.outputs.asset_name }}
-      artifact-name-1.20.4: ${{ steps.upload_release_1.20.4.outputs.asset_name }}
-      artifact-name-1.20.6: ${{ steps.upload_release_1.20.6.outputs.asset_name }}
+      artifact_name_default: ${{ steps.upload_release_default.outputs.asset_name }}
+      artifact_name_1_19_4: ${{ steps.upload_release_1_19_4.outputs.asset_name }}
+      artifact_name_1_20_4: ${{ steps.upload_release_1_20_4.outputs.asset_name }}
+      artifact_name_1_20_6: ${{ steps.upload_release_1_20_6.outputs.asset_name }}
 
     steps:
       - name: Set the git information
@@ -64,7 +64,7 @@ jobs:
 
       # Получаем имя собранного JAR файла для ветки ver/1.19.4
       - name: Get jar file name for ver/1.19.4
-        id: get_name_1.19.4
+        id: get_name_1_19_4
         run: echo "::set-output name=name::$(ls ~/folia-1.19.4/build/libs/ | grep paperclip)"
 
       # Сборка для ветки ver/1.20.4
@@ -78,7 +78,7 @@ jobs:
 
       # Получаем имя собранного JAR файла для ветки ver/1.20.4
       - name: Get jar file name for ver/1.20.4
-        id: get_name_1.20.4
+        id: get_name_1_20_4
         run: echo "::set-output name=name::$(ls ~/folia-1.20.4/build/libs/ | grep paperclip)"
 
       # Сборка для ветки ver/1.20.6
@@ -92,7 +92,7 @@ jobs:
 
       # Получаем имя собранного JAR файла для ветки ver/1.20.6
       - name: Get jar file name for ver/1.20.6
-        id: get_name_1.20.6
+        id: get_name_1_20_6
         run: echo "::set-output name=name::$(ls ~/folia-1.20.6/build/libs/ | grep paperclip)"
 
       # Создаем релиз для всех веток
@@ -122,38 +122,38 @@ jobs:
 
       # Загружаем JAR файл для ветки ver/1.19.4
       - name: Upload Release Asset for ver/1.19.4
-        id: upload_release_1.19.4
+        id: upload_release_1_19_4
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release_default.outputs.upload_url }}
-          asset_path: /home/runner/folia-1.19.4/build/libs/${{ steps.get_name_1.19.4.outputs.name }}
-          asset_name: ${{ steps.get_name_1.19.4.outputs.name }}
+          asset_path: /home/runner/folia-1.19.4/build/libs/${{ steps.get_name_1_19_4.outputs.name }}
+          asset_name: ${{ steps.get_name_1_19_4.outputs.name }}
           asset_content_type: application/java-archive
 
       # Загружаем JAR файл для ветки ver/1.20.4
       - name: Upload Release Asset for ver/1.20.4
-        id: upload_release_1.20.4
+        id: upload_release_1_20_4
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release_default.outputs.upload_url }}
-          asset_path: /home/runner/folia-1.20.4/build/libs/${{ steps.get_name_1.20.4.outputs.name }}
-          asset_name: ${{ steps.get_name_1.20.4.outputs.name }}
+          asset_path: /home/runner/folia-1.20.4/build/libs/${{ steps.get_name_1_20_4.outputs.name }}
+          asset_name: ${{ steps.get_name_1_20_4.outputs.name }}
           asset_content_type: application/java-archive
 
       # Загружаем JAR файл для ветки ver/1.20.6
       - name: Upload Release Asset for ver/1.20.6
-        id: upload_release_1.20.6
+        id: upload_release_1_20_6
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release_default.outputs.upload_url }}
-          asset_path: /home/runner/folia-1.20.6/build/libs/${{ steps.get_name_1.20.6.outputs.name }}
-          asset_name: ${{ steps.get_name_1.20.6.outputs.name }}
+          asset_path: /home/runner/folia-1.20.6/build/libs/${{ steps.get_name_1_20_6.outputs.name }}
+          asset_name: ${{ steps.get_name_1_20_6.outputs.name }}
           asset_content_type: application/java-archive
 
     permissions:
