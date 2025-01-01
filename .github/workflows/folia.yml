@@ -1,0 +1,160 @@
+name: folia-custom
+
+on:
+  workflow_dispatch:  # Позволяет запускать workflow вручную через интерфейс GitHub
+  schedule:
+    - cron: "0 12 * * *"  # Сборка в 12:00 по Киеву (UTC+3 летом)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name-default: ${{ steps.upload_release_default.outputs.asset_name }}
+      artifact-name-1.19.4: ${{ steps.upload_release_1.19.4.outputs.asset_name }}
+      artifact-name-1.20.4: ${{ steps.upload_release_1.20.4.outputs.asset_name }}
+      artifact-name-1.20.6: ${{ steps.upload_release_1.20.6.outputs.asset_name }}
+
+    steps:
+      - name: Set the git information
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - uses: actions/checkout@v4
+
+      # Устанавливаем JDK 21
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'zulu'
+
+      # Настроим временную зону на Киев
+      - name: Set timezone to Kyiv
+        run: |
+          sudo timedatectl set-timezone Europe/Kiev
+
+      # Клонируем репозиторий и применяем патчи для основной ветки
+      - name: Clone Folia repo and apply patches (default branch)
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia
+          cd ~/folia
+          git checkout master
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем дату сборки
+      - name: Get date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+      # Получаем имя собранного JAR файла для основной ветки
+      - name: Get jar file name for default branch
+        id: get_name_default
+        run: echo "::set-output name=name::$(ls ~/folia/build/libs/ | grep paperclip)"
+
+      # Сборка для ветки ver/1.19.4
+      - name: Build for ver/1.19.4
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia-1.19.4
+          cd ~/folia-1.19.4
+          git checkout ver/1.19.4
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем имя собранного JAR файла для ветки ver/1.19.4
+      - name: Get jar file name for ver/1.19.4
+        id: get_name_1.19.4
+        run: echo "::set-output name=name::$(ls ~/folia-1.19.4/build/libs/ | grep paperclip)"
+
+      # Сборка для ветки ver/1.20.4
+      - name: Build for ver/1.20.4
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia-1.20.4
+          cd ~/folia-1.20.4
+          git checkout ver/1.20.4
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем имя собранного JAR файла для ветки ver/1.20.4
+      - name: Get jar file name for ver/1.20.4
+        id: get_name_1.20.4
+        run: echo "::set-output name=name::$(ls ~/folia-1.20.4/build/libs/ | grep paperclip)"
+
+      # Сборка для ветки ver/1.20.6
+      - name: Build for ver/1.20.6
+        run: |
+          git clone https://github.com/PaperMC/Folia.git ~/folia-1.20.6
+          cd ~/folia-1.20.6
+          git checkout ver/1.20.6
+          ./gradlew applyPatches
+          ./gradlew createMojmapPaperclipJar
+
+      # Получаем имя собранного JAR файла для ветки ver/1.20.6
+      - name: Get jar file name for ver/1.20.6
+        id: get_name_1.20.6
+        run: echo "::set-output name=name::$(ls ~/folia-1.20.6/build/libs/ | grep paperclip)"
+
+      # Создаем релиз для всех веток
+      - name: Create Release for all branches
+        id: create_release_default
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.date.outputs.date }}-default
+          release_name: Release-${{ steps.date.outputs.date }}-default
+          body: "Release with artifacts for ver/1.19.4, ver/1.20.4, ver/1.20.6, and default branch"
+          draft: false
+          prerelease: false
+
+      # Загружаем JAR файл для основной ветки
+      - name: Upload Release Asset for default branch
+        id: upload_release_default
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_default.outputs.upload_url }}
+          asset_path: /home/runner/folia/build/libs/${{ steps.get_name_default.outputs.name }}
+          asset_name: ${{ steps.get_name_default.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Загружаем JAR файл для ветки ver/1.19.4
+      - name: Upload Release Asset for ver/1.19.4
+        id: upload_release_1.19.4
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_default.outputs.upload_url }}
+          asset_path: /home/runner/folia-1.19.4/build/libs/${{ steps.get_name_1.19.4.outputs.name }}
+          asset_name: ${{ steps.get_name_1.19.4.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Загружаем JAR файл для ветки ver/1.20.4
+      - name: Upload Release Asset for ver/1.20.4
+        id: upload_release_1.20.4
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_default.outputs.upload_url }}
+          asset_path: /home/runner/folia-1.20.4/build/libs/${{ steps.get_name_1.20.4.outputs.name }}
+          asset_name: ${{ steps.get_name_1.20.4.outputs.name }}
+          asset_content_type: application/java-archive
+
+      # Загружаем JAR файл для ветки ver/1.20.6
+      - name: Upload Release Asset for ver/1.20.6
+        id: upload_release_1.20.6
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_default.outputs.upload_url }}
+          asset_path: /home/runner/folia-1.20.6/build/libs/${{ steps.get_name_1.20.6.outputs.name }}
+          asset_name: ${{ steps.get_name_1.20.6.outputs.name }}
+          asset_content_type: application/java-archive
+
+    permissions:
+      contents: write
