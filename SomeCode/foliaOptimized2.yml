@@ -30,7 +30,7 @@ jobs:
       # Список веток, которые нужно собрать (с версиями для Java 17 и Java 21)
       - name: Set branches list
         id: branches
-        run: echo "::set-output name=branches::'ver/1.19.4 ver/1.20.4 ver/1.20.6 ver/old-java-branch1 ver/old-java-branch2'"
+        run: echo "::set-output name=branches::ver/1.19.4 ver/1.20.4 ver/1.20.6 ver/old-java-branch1 ver/old-java-branch2"
 
       # Создание релиза с тегом
       - name: Create GitHub release
@@ -49,15 +49,18 @@ jobs:
       # Цикл по всем веткам для их сборки
       - name: Build and Upload for all specified branches
         run: |
+          # Преобразуем список веток в массив
           branches="${{ steps.branches.outputs.branches }}"
-          for branch in $branches; do
+          IFS=' ' read -r -a branch_array <<< "$branches"  # Разделяем строку на массив по пробелам
+
+          for branch in "${branch_array[@]}"; do  # Используем массив в цикле
             echo "Building branch: $branch"
             rm -rf ~/folia
             git clone https://github.com/PaperMC/Folia.git ~/folia -b $branch
             cd ~/folia
             
             # Определяем, какая версия JDK использовать в зависимости от ветки
-            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6]]; then
+            if [[ "$branch" == ver/1.19.4 || "$branch" == ver/1.20.4 || "$branch" == ver/1.20.6 ]]; then
               echo "Using JDK 21 for branch $branch"
               # Устанавливаем JDK 21 для этих веток
               uses: actions/setup-java@v4
